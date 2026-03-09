@@ -7,8 +7,6 @@ from typing import List
 from pydantic import BaseModel, Field
 from openai import OpenAI
 
-from agent.services.prompts.audit_prompt import AUDIT_PROMPT
-
 logger = logging.getLogger(__name__)
 
 class VulnerabilityFinding(BaseModel):

@@ -14,7 +14,7 @@ import zipfile
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Header
 from pydantic import BaseModel
 from agent.types import TaskResponse
-from agent.services.auditor import Audit, SolidityAuditor
+from agent.services.auditor import Audit
 from agent.services.evmbench import submit_job
 from agent.config import Settings
 import shutil
@@ -33,35 +33,6 @@ class TaskContent(BaseModel):
     """Model for task smart contract content."""
     task_id: str
     files_content: str
-
-async def fetch_solidity_files(contracts_url: str, config: Settings) -> str:
-    """
-    Fetch Solidity files from the API.
-    
-    Args:
-        contracts_url: URL to fetch contracts from
-        task_id: Task ID
-        file_paths: List of file paths to fetch
-        
-    Returns:
-        List of SolidityFile objects
-    """
-    try:
-        async with httpx.AsyncClient() as client:
-            # Fetch all contracts at once from the contracts_url
-            response = await client.get(
-                contracts_url,
-                headers={"X-API-Key": config.agentarena_api_key}
-            )
-            response.raise_for_status()
-            
-            # Parse the response
-            return response.json()
-        
-    except Exception as e:
-        logger.error(f"Error fetching contracts: {str(e)}")
-    
-    return None
 
 async def send_audit_results(callback_url: str, task_id: str, audit: Audit):
     """
