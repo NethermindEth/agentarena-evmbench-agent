@@ -1,8 +1,11 @@
 """
 Server implementation for the AI agent.
 """
+
+import asyncio
 import json
 import logging
+from pathlib import Path
 from typing import Optional
 import httpx
 import tempfile
@@ -12,6 +15,7 @@ from fastapi import FastAPI, HTTPException, BackgroundTasks, Header
 from pydantic import BaseModel
 from agent.types import TaskResponse
 from agent.services.auditor import Audit, SolidityAuditor
+from agent.services.evmbench import submit_job
 from agent.config import Settings
 import shutil
 
@@ -250,59 +254,45 @@ async def process_notification(notification: Notification, config: Settings):
         notification: Notification payload
         config: Application configuration
     """
+
+    temp_zip_path = None
     try:
         logger.info(f"Processing notification for task {notification.task_id}")
         logger.info(f"Notification: {notification}")
-        
-        # Fetch task details (scope and documentation)
-        task_details = await fetch_task_details(notification.task_details_url, config)
-        if not task_details:
-            logger.error(f"Failed to get task details for task {notification.task_id}")
-            return
 
-        if not task_details.selectedFiles:
-            logger.error(f"No files selected for task {notification.task_id}")
-            return
-        
-        # Download, extract, and store repository
-        repo_dir = await setup_repository(
-            notification.task_repository_url, 
-            notification.task_id,
-            config
+        # Download the repository ZIP to a temporary file
+        fd, temp_zip_path = tempfile.mkstemp(suffix=".zip")
+        os.close(fd)
+        async with httpx.AsyncClient() as client:
+            logger.info(f"Downloading repository ZIP from {notification.task_repository_url}")
+            response = await client.get(
+                notification.task_repository_url,
+                headers={"X-API-Key": config.agentarena_api_key}
+            )
+            response.raise_for_status()
+            with open(temp_zip_path, "wb") as f:
+                f.write(response.content)
+
+        # Submit to evmbench (blocking — run in thread pool to avoid blocking async loop)
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, submit_job,
+            config.evmbench_url, config.model, config.api_key, Path(temp_zip_path)
         )
-        if not repo_dir:
-            logger.error(f"Failed to download repository for task {notification.task_id}")
-            return
-        
-        # Read and concatenate selected files
-        concatenated_contracts = read_and_concatenate_files(repo_dir, task_details.selectedFiles)
-        if not concatenated_contracts:
-            logger.warning(f"No valid contracts content found for task {notification.task_id}")
-            return
-        
-        # Read and concatenate selected docs
-        concatenated_docs = read_and_concatenate_files(repo_dir, task_details.selectedDocs)
-        if not concatenated_docs:
-            logger.info(f"No valid docs content found for task {notification.task_id}")
-            # Continue anyway as docs are optional
-        
-        # Audit files
-        auditor = SolidityAuditor(config.openai_api_key, config.openai_model)
-        audit = auditor.audit_files(concatenated_contracts, concatenated_docs, task_details.additionalLinks, task_details.additionalDocs, task_details.qaResponses)
-        
+
         # Send results back
+        audit = Audit(**result)
         await send_audit_results(notification.post_findings_url, notification.task_id, audit)
         
     except Exception as e:
         logger.error(f"Error processing notification: {str(e)}", exc_info=True)
     finally:
-        # Clean up the repository directory
-        if os.path.exists(repo_dir):
+        # Clean up the temporary ZIP
+        if temp_zip_path and os.path.exists(temp_zip_path):
             try:
-                shutil.rmtree(repo_dir)
-                logger.info(f"Repository directory {repo_dir} cleaned up")
+                os.unlink(temp_zip_path)
+                logger.info(f"Temporary ZIP {temp_zip_path} cleaned up")
             except Exception as cleanup_error:
-                logger.error(f"Error cleaning up repository directory {repo_dir}: {str(cleanup_error)}")
+                logger.error(f"Error cleaning up temporary ZIP {temp_zip_path}: {str(cleanup_error)}")
 
 @app.post("/webhook")
 async def webhook(

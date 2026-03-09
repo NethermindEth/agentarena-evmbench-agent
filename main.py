@@ -2,6 +2,7 @@
 """
 Main entry point for the AI agent that audits Solidity contracts for security vulnerabilities.
 """
+
 import argparse
 import sys
 from agent.server import start_server
@@ -17,8 +18,7 @@ def main():
     parser.add_argument("--repo", help="GitHub repository URL (required for local mode)")
     parser.add_argument("--commit", help="Specific commit hash to audit (optional for local mode)")
     parser.add_argument("--output", help="Output file path (for local mode)", default="security_audit_results.txt")
-    parser.add_argument("--only-selected-files", action="store_true", help="Display and select specific .sol files to audit")
-    
+
     # Server mode arguments
     parser.add_argument("--host", help="Host for the server (server mode)", default="0.0.0.0")
     parser.add_argument("--port", help="Port for the server (server mode)", type=int, default=8000)
@@ -47,7 +47,7 @@ def main():
             parser.print_help()
             sys.exit(1)
 
-        process_local(repo_url=args.repo, output_path=args.output, config=config, commit_hash=args.commit, only_selected=args.only_selected_files)
+        process_local(repo_url=args.repo, output_path=args.output, config=config, commit_hash=args.commit)
     else:
         parser.print_help()
 

@@ -1,20 +1,31 @@
 """
 Configuration management for the AI agent.
 """
+
 import os
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Literal
 from pydantic_settings import BaseSettings
 from pydantic import Field
 from dotenv import load_dotenv
 
 class Settings(BaseSettings):
-    """Application settings loaded from environment variables."""
+    """
+    Application settings loaded from environment variables.
+    """
+
     # Required fields for local mode
-    openai_api_key: str = Field(..., env="OPENAI_API_KEY")
-    openai_model: str = Field("gpt-4.1-nano-2025-04-14", env="OPENAI_MODEL")
+    api_key: str = Field(..., env="API_KEY")
+    model: Literal[
+        'codex-gpt-5.1-codex-max', 'codex-gpt-5.2',
+        'claude-opus-4.5', 'claude-sonnet-4.5',
+        'gemini-2.5-pro', 'gemini-2.5-flash'
+    ] = Field("codex-gpt-5.1-codex-max", env="MODEL")
     log_level: str = Field("INFO", env="LOG_LEVEL")
     log_file: str = Field("agent.log", env="LOG_FILE")
     
+    # EVMBench service URL
+    evmbench_url: str = Field("http://localhost:1337", env="EVMBENCH_URL")
+
     # Additional fields for server mode
     agentarena_api_key: Optional[str] = Field(None, env="AGENTARENA_API_KEY")
     webhook_auth_token: Optional[str] = Field(None, env="WEBHOOK_AUTH_TOKEN")
