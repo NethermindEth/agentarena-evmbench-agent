@@ -16,7 +16,7 @@ import json
 import sys
 import time
 from pathlib import Path
-import requests
+import httpx
 
 
 _SEVERITY_MAP = {
@@ -68,16 +68,16 @@ def start_job(base_url: str, model: str, api_key: str, zip_path: Path) -> str:
     url = f"{base_url}/v1/jobs/start"
     with zip_path.open("rb") as fh:
         try:
-            resp = requests.post(
+            resp = httpx.post(
                 url,
                 files={"file": (zip_path.name, fh, "application/zip")},
                 data={"model": model, "api_key": api_key},
                 timeout=30,
             )
-        except requests.ConnectionError as exc:
+        except httpx.ConnectError as exc:
             sys.exit(f"Server not available: {exc}")
 
-    if not resp.ok:
+    if not resp.is_success:
         sys.exit(f"Failed to start job ({resp.status_code}): {resp.text}")
 
     body = resp.json()
@@ -90,11 +90,11 @@ def poll_job(base_url: str, job_id: str) -> dict:
     url = f"{base_url}/v1/jobs/{job_id}"
     while True:
         try:
-            resp = requests.get(url, timeout=30)
-        except requests.ConnectionError as exc:
+            resp = httpx.get(url, timeout=30)
+        except httpx.ConnectError as exc:
             sys.exit(f"Server not available while polling: {exc}")
 
-        if not resp.ok:
+        if not resp.is_success:
             sys.exit(f"Error polling job ({resp.status_code}): {resp.text}")
 
         body = resp.json()
