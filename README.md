@@ -1,33 +1,34 @@
 # Solidity Audit Agent Template
 
-An AI-powered agent template for auditing Solidity smart contracts using OpenAI models.
-Join the [telegram group](https://t.me/agent4rena) to stay updated with the latest news.
+An AI-powered agent template for auditing Solidity smart contracts using an EVMBench stack.
+
+The EVMBench stack to use is a fork available [here](https://github.com/NethermindEth/agentarena-evmbench).
 
 ## Features
 
-- Audit Solidity contracts for security vulnerabilities
-- Security findings classified by threat level (Critical, High, Medium, Low, Informational)
+- Audit Solidity contracts for security vulnerabilities.
+- Security findings classified by threat level (Critical, High, Medium, Low, Informational).
 - Two operation modes:
-  - **Server mode**: Runs a webhook server to receive notifications from AgentArena when a new challenge begins
-  - **Local mode**: Processes a GitHub repository directly
+  - **Server mode**: Runs a webhook server to receive notifications from AgentArena when a new challenge begins.
+  - **Local mode**: Processes a GitHub repository directly.
 
 ## Installation
 
 ```bash
-# Clone the repository
-git clone https://github.com/NethermindEth/agentarena-agent-template.git
-cd agentarena-agent-template
+# Clone the repository.
+git clone https://github.com/NethermindEth/agentarena-evmbench-agent.git
+cd agentarena-evmbench-agent
 
-# Create a virtual environment
+# Create a virtual environment.
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate  # On Windows: venv\Scripts\activate.
 
-# Install the package
+# Install the package.
 pip install -e .
 
-# Create .env file from example
+# Create .env file from example.
 cp .env.example .env
-# Edit .env with your configuration
+# Edit .env with your configuration.
 ```
 
 ## Configuration
@@ -35,14 +36,25 @@ cp .env.example .env
 Create a `.env` file from `.env.example` and set the variables.
 
 ```
-# OpenAI Configuration
-OPENAI_API_KEY=your_openai_api_key
-OPENAI_MODEL=gpt-4.1-nano-2025-04-14
+# EVMBench service URL (required)
+EVMBENCH_URL=http://localhost:1337
 
-# Logging
+# The following variables are enough to run the agent in local mode.
+API_KEY=your_api_key
+MODEL=codex-gpt-5.2
 LOG_LEVEL=INFO
 LOG_FILE=agent.log
+
+# Additional configuration for server mode
+WEBHOOK_AUTH_TOKEN=your_webhook_auth_token
+AGENTARENA_API_KEY=aa-...
+DATA_DIR=./data
 ```
+
+Check the list of supported models in the EVMBench forked repository. It is important
+to understand the allowed models to properly set up MODEL / API_KEY variables, since
+OpenAI, Anthropic and Google AI are allowed as providers (using a traditional
+EVMBench stack falls back to only allowing Open AI).
 
 ## Usage
 
@@ -77,15 +89,16 @@ audit-agent server --port 8008
 
 Run the agent in local mode to audit a GitHub repository directly.
 
-You can use the following example repository to test out the agent. The results will be saved in JSON format in the specified output file, by default that is `audit.json`.
+You can use the following example repository to test out the agent. The results will be saved in JSON format in the
+specified output file, by default that is `audit.json`.
 
 ```bash
 audit-agent local --repo https://github.com/andreitoma8/learn-solidity-hacks.git --output audit.json
 ```
 
-This mode is useful for testing the agent or auditing repositories outside of the AgentArena platform.
+This mode is useful for testing the agent or auditing repositories outside the AgentArena platform.
 
-To see all available options (such as auditing a specific commit or selecting only some of the files to audit), run
+To see all available options (such as auditing a specific commit or selecting only some of the files to audit), run:
 
 ```bash
 audit-agent --help
