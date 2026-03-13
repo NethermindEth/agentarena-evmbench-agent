@@ -22,7 +22,7 @@ dependencies = [
 ]
 
 [project.scripts]
-audit-agent = "agent.main:main"
+audit-agent = "main:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["agent"]
