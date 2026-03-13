@@ -80,16 +80,16 @@ async def send_audit_results(callback_url: str, task_id: str, audit: Audit):
         # Any other unexpected errors
         logger.error(f"Unexpected error sending audit results: {str(e)}", exc_info=True)
 
-async def fetch_task_details(details_url: str, config: Settings) -> TaskResponse:
+async def fetch_task_details(details_url: str, config: Settings) -> tuple[TaskResponse | None, dict | None]:
     """
     Fetch task details including the list of selected files.
-    
+
     Args:
         details_url: URL to fetch task details
         config: Application configuration
-        
+
     Returns:
-        TaskResponse object containing task details including selectedFiles
+        Tuple of (TaskResponse, raw dict) or (None, None) if failed
     """
     try:
         async with httpx.AsyncClient() as client:
@@ -99,10 +99,10 @@ async def fetch_task_details(details_url: str, config: Settings) -> TaskResponse
             )
             response.raise_for_status()
             task_data = response.json()
-            return TaskResponse(**task_data)
+            return TaskResponse(**task_data), task_data
     except Exception as e:
         logger.error(f"Error fetching task details: {str(e)}", exc_info=True)
-        return None
+        return None, None
 
 async def setup_repository(repo_url: str, task_id: str, config: Settings) -> Optional[str]:
     """
@@ -243,6 +243,26 @@ async def process_notification(notification: Notification, config: Settings):
             response.raise_for_status()
             with open(temp_zip_path, "wb") as f:
                 f.write(response.content)
+
+        # Fetch competition task details and embed the raw JSON into the ZIP
+        _, task_raw = await fetch_task_details(notification.task_details_url, config)
+        if task_raw is not None:
+            aa_filename = "__IMPORTANT_AA_user-notes__.json"
+            try:
+                with zipfile.ZipFile(temp_zip_path, "a") as zf:
+                    existing = set(zf.namelist())
+                    # Avoid collisions (extremely unlikely, but be safe)
+                    candidate = aa_filename
+                    suffix = 1
+                    while candidate in existing:
+                        candidate = f"__IMPORTANT_AA_user-notes__{suffix}__.json"
+                        suffix += 1
+                    zf.writestr(candidate, json.dumps(task_raw, indent=2))
+                    logger.info(f"Embedded competition data as '{candidate}' in ZIP")
+            except Exception as embed_err:
+                logger.error(f"Failed to embed competition data in ZIP: {embed_err}", exc_info=True)
+        else:
+            logger.warning("Could not fetch task details; ZIP sent without embedded competition data")
 
         # Submit to evmbench (blocking — run in thread pool to avoid blocking async loop)
         result = await asyncio.get_event_loop().run_in_executor(
