@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     api_key: str = Field(..., env="API_KEY")
     model: Literal[
         'codex-gpt-5.1-codex-max', 'codex-gpt-5.2', 'gpt-5.3-codex',
-        'claude-opus-4.6', 'claude-sonnet-4.6',
+        'claude-opus-4-6', 'claude-sonnet-4-6',
         'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview'
     ] = Field("gpt-5.3-codex", env="MODEL")
     log_level: str = Field("INFO", env="LOG_LEVEL")
