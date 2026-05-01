@@ -20,12 +20,12 @@ import httpx
 
 
 _SEVERITY_MAP = {
-    "critical": "Critical",
+    "critical": "High",
     "high": "High",
     "medium": "Medium",
     "low": "Low",
-    "info": "Informational",
-    "informational": "Informational",
+    "info": "Info",
+    "informational": "Info",
 }
 
 
