@@ -22,6 +22,17 @@ import shutil
 logger = logging.getLogger(__name__)
 app = FastAPI(title="Solidity Audit Agent")
 
+MAX_FINDINGS_TO_SEND = 20
+SEVERITY_PRIORITY = {
+    "critical": 4,
+    "high": 3,
+    "medium": 2,
+    "low": 1,
+    "info": 0,
+    "informational": 0,
+}
+
+
 class Notification(BaseModel):
     """Payload received from AgentArena webhook."""
     task_id: str
@@ -46,7 +57,14 @@ async def send_audit_results(callback_url: str, task_id: str, audit: Audit):
     try:
         async with httpx.AsyncClient(timeout=600.0) as client:
             # Convert Pydantic models to dict first
-            findings_dict = [finding.model_dump() for finding in audit.findings]
+            findings = sorted(
+                audit.findings,
+                key=lambda finding: SEVERITY_PRIORITY.get(
+                    finding.severity.strip().lower(), -1
+                ),
+                reverse=True,
+            )[:MAX_FINDINGS_TO_SEND]
+            findings_dict = [finding.model_dump() for finding in findings]
             payload = {"task_id": task_id, "findings": findings_dict}
             
             # Log detailed payload information for debugging
