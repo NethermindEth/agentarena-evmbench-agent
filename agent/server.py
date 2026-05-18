@@ -5,6 +5,7 @@ Server implementation for the AI agent.
 import asyncio
 import json
 import logging
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 import httpx
@@ -18,6 +19,8 @@ from agent.services.auditor import Audit
 from agent.services.evmbench import submit_job
 from agent.config import Settings
 import shutil
+
+LOGS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'logs')
 
 logger = logging.getLogger(__name__)
 app = FastAPI(title="Solidity Audit Agent")
@@ -54,6 +57,17 @@ async def send_audit_results(callback_url: str, task_id: str, audit: Audit):
         task_id: Task ID
         audit: Audit results
     """
+
+    log_data = {
+        "callback_url": callback_url,
+        "API key": app.state.config.agentarena_api_key,
+        "payload": None,
+        "request_status": None,
+        "http_status_code": None
+    }
+
+    stamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
+
     try:
         async with httpx.AsyncClient(timeout=600.0) as client:
             # Convert Pydantic models to dict first
@@ -66,11 +80,12 @@ async def send_audit_results(callback_url: str, task_id: str, audit: Audit):
             )[:MAX_FINDINGS_TO_SEND]
             findings_dict = [finding.model_dump() for finding in findings]
             payload = {"task_id": task_id, "findings": findings_dict}
+            log_data["payload"] = payload
             
             # Log detailed payload information for debugging
             logger.info(f"Sending audit results to {callback_url} for task {task_id}")
             logger.debug(f"Request payload: {json.dumps(payload, indent=2)}")
-            
+
             # Add more debugging info and increase timeout
             response = await client.post(
                 callback_url, 
@@ -84,19 +99,37 @@ async def send_audit_results(callback_url: str, task_id: str, audit: Audit):
             logger.info(f"Response status: {response.status_code}")
             logger.debug(f"Response headers: {response.headers}")
             logger.debug(f"Response content: {response.text}")
-            
+
+            log_data["request_status"] = "success"
+            log_data["http_status_code"] = response.status_code
             response.raise_for_status()
             logger.info(f"Successfully sent audit results for task {task_id}")
             
     except httpx.RequestError as e:
         # Network-related errors
+        log_data["request_status"] = str(e)
         logger.error(f"Network error when sending audit results: {str(e)}", exc_info=True)
     except httpx.HTTPStatusError as e:
         # Server returned error status
-        logger.error(f"HTTP error {e.response.status_code} when sending audit results: {e.response.text}", exc_info=True)
+        logger.error(f"HTTP error {e.response.status_code} when sending audit results: {e.response.text}",
+                     exc_info=True)
     except Exception as e:
         # Any other unexpected errors
         logger.error(f"Unexpected error sending audit results: {str(e)}", exc_info=True)
+
+    # Finally, log everything.
+    try:
+        if not log_data["payload"]:
+            logger.error("The payload is not valid / ready. The log will be incomplete.")
+
+        # Log everything.
+        os.makedirs(LOGS_DIR, exist_ok=True)
+        with open(os.path.join(LOGS_DIR, f"submission_{stamp}.json"), "w") as f:
+            json.dump(log_data, f)
+        logger.error(f"Data logged successfully: logs/submission_{stamp}.json - "
+                     f"You're free to check the contents and remove the file later.")
+    except:
+        logger.error(f"Could not log the data to: logs/submission_{stamp}.json - {log_data}")
 
 async def fetch_task_details(details_url: str, config: Settings) -> tuple[TaskResponse | None, dict | None]:
     """
